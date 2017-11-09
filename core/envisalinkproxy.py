@@ -1,19 +1,18 @@
-import logger
-
 from tornado import gen
 from tornado.tcpserver import TCPServer
 from tornado.iostream import IOStream, StreamClosedError
 
-from config import config
-from events import events
-from envisalink import get_checksum
+from .config import config
+from .events import events
+from .envisalink import get_checksum
+from .logger import debug, info
 
 #TODO: handle exceptions
 
 class Proxy(object):
     def __init__(self):
         if config.ENABLEPROXY == True:
-            logger.debug('Staring Envisalink Proxy')
+            debug('Staring Envisalink Proxy')
             proxy = ProxyServer()
             proxy.listen(config.ENVISALINKPROXYPORT)
 
@@ -27,7 +26,7 @@ class ProxyServer(TCPServer):
     def handle_stream(self, stream, address):
         connection = ProxyConnection(stream, address)
         fromaddr = "%s:%s" % (address[0], address[1])
-        logger.debug('Proxy Connection from: %s' % fromaddr)
+        debug('Proxy Connection from: %s' % fromaddr)
         self.connections[fromaddr]=stream
         yield connection.on_connect()
         del self.connections[fromaddr]
@@ -52,7 +51,7 @@ class ProxyConnection(object):
 
     @gen.coroutine
     def on_disconnect(self):
-        logger.debug('Client: %s:%s disconnected' % (self.address[0], self.address[1]))
+        debug('Client: %s:%s disconnected' % (self.address[0], self.address[1]))
         
     @gen.coroutine
     def dispatch_client(self):
@@ -63,11 +62,11 @@ class ProxyConnection(object):
                     events.put('envisalink', None, line) 
                 else:
                     if line.strip() == ('005' + config.ENVISALINKPROXYPASS + get_checksum('005', config.ENVISALINKPROXYPASS)):
-                        logger.info('Proxy User Authenticated')
+                        info('Proxy User Authenticated')
                         self.authenticated = True
                         self.send_command('5051')
                     else:
-                        logger.info('Proxy User Authentication failed')
+                        info('Proxy User Authentication failed')
                         self.send_command('5050')
                         self.stream.close()
         except StreamClosedError:
@@ -80,5 +79,5 @@ class ProxyConnection(object):
             to_send = data+get_checksum(data, '')+'\r\n'
         else:
             to_send = data+'\r\n'
-        logger.debug('PROXY < %s' % to_send.strip())
+        debug('PROXY < %s' % to_send.strip())
         yield self.stream.write(to_send)

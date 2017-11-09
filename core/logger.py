@@ -1,7 +1,7 @@
 import logging, inspect
 import sys
 import os
-from Queue import Queue
+from queue import Queue
 
 #set the root path of our scrippt
 rootpath = os.path.dirname(os.path.abspath(sys.modules['__main__'].__file__)) + '/'

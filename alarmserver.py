@@ -72,8 +72,8 @@ def main(argv):
         if str.find(p, '__init__.py') != -1: continue
         base=os.path.basename(p)
         name=os.path.splitext(base)[0]
-        exec "from plugins import %s" % name
-        exec "%s.init()" % name
+        exec("from plugins import {0}".format(name))
+        exec("{0}.init()".format(name))
 
     #start tornado ioloop
     tornado.ioloop.IOLoop.instance().start()

@@ -1,4 +1,4 @@
-import logger
+from .logger import debug
 
 class events():
     @staticmethod
@@ -16,7 +16,7 @@ class events():
             events.listeners[eventType] = []
 
         events.listeners[eventType].append({'callback' : callback, 'partitionFilter' : partitionFilter, 'zoneFilter' : zoneFilter})
-        logger.debug('Registered Callback for: %s' % eventType)
+        debug('Registered Callback for: %s' % eventType)
 
     @staticmethod
     def put(eventType, type = None, parameters = None, *args):
@@ -27,6 +27,6 @@ class events():
                         or (type not in ['partition', 'zone'])):
                     c['callback'](eventType, type, parameters, *args)
                 else:
-                    logger.debug('Event type: %s/%s parameters: %s Filtered' % (eventType, type, parameters))
+                    debug('Event type: %s/%s parameters: %s Filtered' % (eventType, type, parameters))
         except KeyError:
-            logger.debug('No handler registered for: %s' % eventType)
+            debug('No handler registered for: %s' % eventType)

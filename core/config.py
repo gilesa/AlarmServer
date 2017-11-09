@@ -1,5 +1,6 @@
-import ConfigParser
-from core import logger
+import os
+import configparser
+from .logger import debug
 
 MAXPARTITIONS=16
 MAXZONES=128
@@ -8,8 +9,8 @@ MAXALARMUSERS=47
 class config():
     @staticmethod
     def load(configfile):
-        logger.debug('Loading config file: %s' % configfile)
-        config._config = ConfigParser.ConfigParser()
+        debug('Loading config file: %s' % configfile)
+        config._config = configparser.ConfigParser()
 
         if config._config.read(configfile) == []:
             raise RuntimeError('Unable to load config file: %s' % configfile)
@@ -17,8 +18,8 @@ class config():
         config.LOGURLREQUESTS = config.read_config_var('alarmserver', 'logurlrequests', True, 'bool')
         config.HTTPSPORT = config.read_config_var('alarmserver', 'httpsport', 8111, 'int')
         config.HTTPS = config.read_config_var('alarmserver', 'https', True, 'bool')
-        config.CERTFILE = config.read_config_var('alarmserver', 'certfile', 'server.crt', 'str')
-        config.KEYFILE = config.read_config_var('alarmserver', 'keyfile', 'server.key', 'str')
+        config.CERTFILE = os.path.join(os.getcwd(), config.read_config_var('alarmserver', 'certfile', 'server.crt', 'str'))
+        config.KEYFILE = os.path.join(os.getcwd(), config.read_config_var('alarmserver', 'keyfile', 'server.key', 'str'))
         config.HTTPPORT = config.read_config_var('alarmserver', 'httpport', 8011, 'int')
         config.HTTP = config.read_config_var('alarmserver', 'http', False, 'bool')
         config.WEBAUTHUSER = config.read_config_var('alarmserver', 'webauthuser', False, 'str')
@@ -59,7 +60,7 @@ class config():
     @staticmethod
     def defaulting(section, variable, default, quiet = False):
         if quiet == False:
-            logger.debug('Config option '+ str(variable) + ' not set in ['+str(section)+'] defaulting to: \''+str(default)+'\'')
+            debug('Config option '+ str(variable) + ' not set in ['+str(section)+'] defaulting to: \''+str(default)+'\'')
 
     @staticmethod
     def read_config_var(section, variable, default, type = 'str', quiet = False):
@@ -74,6 +75,6 @@ class config():
                 return config._config.get(section,variable).split(",")
             elif type == 'listint':
                 return [int (i) for i in config._config.get(section,variable).split(",")]
-        except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+        except (configparser.NoSectionError, configparser.NoOptionError):
             config.defaulting(section, variable, default, quiet)
             return default

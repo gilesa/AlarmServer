@@ -3,17 +3,16 @@ from tornado import gen
 from tornado.tcpclient import TCPClient
 from tornado.iostream import IOStream, StreamClosedError
 from socket import gaierror
-from envisalinkdefs import evl_ResponseTypes
-from envisalinkdefs import evl_Defaults
-from envisalinkdefs import evl_ArmModes
+from .envisalinkdefs import evl_ResponseTypes
+from .envisalinkdefs import evl_Defaults
+from .envisalinkdefs import evl_ArmModes
 
-#alarmserver logger
-import logger
 import tornado.ioloop
 
 #import config
-from config import config
-from events import events
+from .config import config
+from .events import events
+from .logger import debug, info, warning
 
 def getMessageType(code):
     return evl_ResponseTypes[code]
@@ -29,7 +28,7 @@ def get_checksum(code, data):
 
 class Client(object):
     def __init__(self):
-        logger.debug('Starting Envisalink Client')
+        debug('Starting Envisalink Client')
 
         # Register events for alarmserver requests -> envisalink
         events.register('alarm_update', self.request_action)
@@ -66,27 +65,27 @@ class Client(object):
     def do_connect(self, reconnect = False):
         # Create the socket and connect to the server
         if reconnect == True:
-            logger.warning('Connection failed, retrying in %s seconds' % str(self._retrydelay))
+            warning('Connection failed, retrying in %s seconds' % str(self._retrydelay))
             yield gen.sleep(self._retrydelay)
 
         while self._connection == None:
-            logger.debug('Connecting to {}:{}'.format(config.ENVISALINKHOST, config.ENVISALINKPORT))
+            debug('Connecting to {}:{}'.format(config.ENVISALINKHOST, config.ENVISALINKPORT))
             try:
                 self._connection = yield self.tcpclient.connect(config.ENVISALINKHOST, config.ENVISALINKPORT)
                 self._connection.set_close_callback(self.handle_close)
             except StreamClosedError:
                 #failed to connect, but got no connection object so we will loop here
-                logger.warning('Connection failed, retrying in %s seconds' % str(self._retrydelay))
+                warning('Connection failed, retrying in %s seconds' % str(self._retrydelay))
                 yield gen.sleep(self._retrydelay)
                 continue
             except gaierror:
                 #could not resolve host provided, if this is a reconnect, will retry, if not, will fail
                 if reconnect == True:
-                    logger.warning('Connection failed, unable to resolve hostname %s, retrying in %s seconds' % (config.ENVISALINKHOST, str(self._retrydelay)))
+                    warning('Connection failed, unable to resolve hostname %s, retrying in %s seconds' % (config.ENVISALINKHOST, str(self._retrydelay)))
                     yield gen.sleep(self._retrydelay)
                     continue
                 else:
-                    logger.warning('Connection failed, unable to resolve hostname %s.  Exiting due to incorrect hostname.' % config.ENVISALINKHOST)
+                    warning('Connection failed, unable to resolve hostname %s.  Exiting due to incorrect hostname.' % config.ENVISALINKHOST)
                     sys.exit(0)
 
             try:
@@ -96,13 +95,13 @@ class Client(object):
                 #and let handle_close deal with this
                 return
 
-            logger.debug("Connected to %s:%i" % (config.ENVISALINKHOST, config.ENVISALINKPORT))
+            debug("Connected to %s:%i" % (config.ENVISALINKHOST, config.ENVISALINKPORT))
             self.handle_line(line)
 
     @gen.coroutine
     def handle_close(self):
         self._connection = None
-        #logger.info("Disconnected from %s:%i" % (config.ENVISALINKHOST, config.ENVISALINKPORT))
+        #info("Disconnected from %s:%i" % (config.ENVISALINKHOST, config.ENVISALINKPORT))
         self.do_connect(True)
 
     @gen.coroutine    
@@ -114,7 +113,7 @@ class Client(object):
 
         try:
             res = yield self._connection.write(to_send)
-            logger.debug('TX > '+to_send[:-1])
+            debug('TX > '+to_send[:-1])
         except StreamClosedError:
             #we don't need to handle this, the callback has been set for closed connections.
             pass
@@ -128,14 +127,14 @@ class Client(object):
 
         input = rawinput.strip()
         if config.ENVISALINKLOGRAW == True:
-            logger.debug('RX RAW < "' + str(input) + '"')
+            debug('RX RAW < "' + str(input) + '"')
 
         if re.match(r'^\d\d:\d\d:\d\d ',input):
             evltime = input[:8]
             input = input[9:]
 
         if not re.match(r'^[0-9a-fA-F]{5,}$', input):
-            logger.warning('Received invalid TPI message: ' + repr(rawinput));
+            warning('Received invalid TPI message: ' + repr(rawinput));
             return
 
         code = int(input[:3])
@@ -143,19 +142,19 @@ class Client(object):
         try:
             event = getMessageType(int(code))
         except KeyError:
-            logger.warning('Received unknown TPI code: "%s", parameters: "%s"' %
+            warning('Received unknown TPI code: "%s", parameters: "%s"' %
                            (input[:3], parameters))
             return
 
         rcksum = int(input[-2:], 16)
         ccksum = int(get_checksum(input[:3],parameters), 16)
         if rcksum != ccksum:
-            logger.warning('Received invalid TPI checksum %02X vs %02X: "%s"' %
+            warning('Received invalid TPI checksum %02X vs %02X: "%s"' %
                            (rcksum, ccksum, input))
             return
 
         message = self.format_event(event, parameters)
-        logger.debug('RX < ' +str(code)+' - '+message)
+        debug('RX < ' +str(code)+' - '+message)
 
         try:
             handler = "handle_%s" % event['handler']
@@ -219,7 +218,7 @@ class Client(object):
         if parameters == '1':
             self.send_command('001')
         if parameters == '0':
-            logger.warning('Incorrect envisalink password')
+            warning('Incorrect envisalink password')
             sys.exit(0)
 
     def handle_event(self, code, parameters, event, message):
@@ -237,9 +236,9 @@ class Client(object):
         if (event['type'] == 'zone' and parameters in config.ZONENAMES) or (event['type'] == 'partition' and parameters in config.PARTITIONNAMES):
             events.put('alarm', event['type'], parameters, code, event, message, defaultStatus) 
         elif (event['type'] == 'zone' or event['type'] == 'partition'):
-            logger.debug('Ignoring unnamed %s %s' % (event['type'], parameters))
+            debug('Ignoring unnamed %s %s' % (event['type'], parameters))
         else:
-            logger.debug('Ignoring unhandled event %s' % event['type'])
+            debug('Ignoring unhandled event %s' % event['type'])
 
     def handle_zone(self, code, parameters, event, message):
         self.handle_event(code, parameters[1:], event, message)
@@ -275,7 +274,7 @@ class Client(object):
     def envisalink_proxy(self, eventType, type, parameters, *args):
         try:
             res = yield self._connection.write(parameters)
-            logger.debug('PROXY > '+parameters.strip())
+            debug('PROXY > '+parameters.strip())
         except StreamClosedError:
             #we don't need to handle this, the callback has been set for closed connections.
             pass

@@ -1,4 +1,4 @@
-import httplib, urllib, json
+import urllib, json
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 from tornado import gen
 

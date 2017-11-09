@@ -1,12 +1,12 @@
 import datetime
 
 #alarmserver modules
-import logger
-from config import config
-from events import events
+from .config import config
+from .events import events
+from .logger import debug
 
 class state():
-    logger.debug('State Module Loaded')
+    debug('State Module Loaded')
 
     @staticmethod
     def init():
@@ -43,7 +43,7 @@ class state():
         if prev_status != None:
             #if we've seen this before, check if it's changed
             if prev_status == state.state[type][parameters]['status']:
-                logger.debug('Discarded event. State not changed. ({} {})'.format(event['type'], parameters))
+                debug('Discarded event. State not changed. ({} {})'.format(event['type'], parameters))
             else:
                 events.put('statechange', type, parameters, code, event, message, defaultStatus)
         else:
